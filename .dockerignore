@@ -1,0 +1,11 @@
+# Docker ignore for Google Cloud Run builds
+node_modules
+.venv
+venv
+__pycache__
+*.pyc
+.git
+.gitignore
+.env
+.DS_Store
+dist

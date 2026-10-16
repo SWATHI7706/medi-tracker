@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+
+# Build outputs
+frontend/dist/
+dist/
+
+# Environment and sensitive keys
+.env
+.env.local
+backend/.env
+frontend/.env
+
+# Local upload data
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/uploads/reports/*
+!backend/uploads/reports/.gitkeep
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
