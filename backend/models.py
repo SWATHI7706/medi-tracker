@@ -3,12 +3,12 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 class UserRegister(BaseModel):
-    email: EmailStr
+    email: str
     password: str
-    full_name: str
+    full_name: Optional[str] = "User"
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class TokenResponse(BaseModel):

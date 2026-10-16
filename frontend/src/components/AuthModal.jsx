@@ -56,11 +56,21 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
             }
         } catch (err) {
             console.error("Auth error", err);
-            const msg =
-                err.response?.data?.detail ||
-                (isLogin
-                    ? "Failed to sign in. Please verify your email and password."
-                    : "Failed to create account. Please ensure email is valid and password has at least 6 characters.");
+            let msg = isLogin
+                ? "Failed to sign in. Please check your email and password."
+                : "Failed to create account. Please ensure all details are provided.";
+            if (err.response?.data?.detail) {
+                const detail = err.response.data.detail;
+                if (typeof detail === "string") {
+                    msg = detail;
+                } else if (Array.isArray(detail)) {
+                    msg = detail.map((d) => d.msg || JSON.stringify(d)).join(", ");
+                } else if (typeof detail === "object") {
+                    msg = JSON.stringify(detail);
+                }
+            } else if (err.message) {
+                msg = `Connection error: ${err.message}`;
+            }
             setError(msg);
         } finally {
             setLoading(false);
@@ -85,7 +95,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
             }
         } catch (err) {
             console.error("Demo login error", err);
-            setError("Could not sign in with demo account. You can register a new account instead.");
+            let msg = "Could not sign in with demo account.";
+            if (err.response?.data?.detail) {
+                const detail = err.response.data.detail;
+                msg = typeof detail === "string" ? detail : (Array.isArray(detail) ? detail.map((d) => d.msg || "").join(", ") : JSON.stringify(detail));
+            } else if (err.message) {
+                msg = `Connection error: ${err.message}`;
+            }
+            setError(msg);
         } finally {
             setLoading(false);
         }

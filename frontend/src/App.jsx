@@ -176,6 +176,9 @@ export default function App() {
     }, [fetchData]);
 
     const handleAuthSuccess = async (token, loggedInUser) => {
+        if (token) {
+            localStorage.setItem("authToken", token);
+        }
         setUser(loggedInUser);
         setAuthModalOpen(false);
         await fetchData();

@@ -22,6 +22,8 @@ except Exception as e:
 def serialize_doc(doc: dict) -> dict:
     if not doc:
         return {}
-    doc["id"] = str(doc["_id"])
-    del doc["_id"]
-    return doc
+    res = dict(doc)
+    if "_id" in res:
+        res["id"] = str(res["_id"])
+        del res["_id"]
+    return res

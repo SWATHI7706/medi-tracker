@@ -29,27 +29,39 @@ export default function AuthView({ onAuthSuccess, theme, toggleTheme }) {
         setLoading(true);
 
         try {
+            let res;
             if (isLogin) {
-                const res = await axios.post(`${API_BASE_URL}/auth/login`, {
+                res = await axios.post(`${API_BASE_URL}/auth/login`, {
                     email: email.trim(),
                     password: password,
                 });
-                onAuthSuccess(res.data.access_token, res.data.user);
             } else {
-                const res = await axios.post(`${API_BASE_URL}/auth/register`, {
+                res = await axios.post(`${API_BASE_URL}/auth/register`, {
                     full_name: fullName.trim(),
                     email: email.trim(),
                     password: password,
                 });
-                onAuthSuccess(res.data.access_token, res.data.user);
             }
+            const { access_token, user } = res.data;
+            localStorage.setItem("authToken", access_token);
+            onAuthSuccess(access_token, user);
         } catch (err) {
             console.error("Auth error", err);
-            const msg =
-                err.response?.data?.detail ||
-                (isLogin
-                    ? "Failed to sign in. Please verify your email and password."
-                    : "Failed to create account. Please check your details.");
+            let msg = isLogin
+                ? "Failed to sign in. Please verify your email and password."
+                : "Failed to create account. Please check your details.";
+            if (err.response?.data?.detail) {
+                const detail = err.response.data.detail;
+                if (typeof detail === "string") {
+                    msg = detail;
+                } else if (Array.isArray(detail)) {
+                    msg = detail.map((d) => d.msg || JSON.stringify(d)).join(", ");
+                } else if (typeof detail === "object") {
+                    msg = JSON.stringify(detail);
+                }
+            } else if (err.message) {
+                msg = `Connection error: ${err.message}`;
+            }
             setError(msg);
         } finally {
             setLoading(false);
@@ -64,10 +76,19 @@ export default function AuthView({ onAuthSuccess, theme, toggleTheme }) {
                 email: "demo@meditracker.com",
                 password: "Password123!",
             });
-            onAuthSuccess(res.data.access_token, res.data.user);
+            const { access_token, user } = res.data;
+            localStorage.setItem("authToken", access_token);
+            onAuthSuccess(access_token, user);
         } catch (err) {
             console.error("Demo login error", err);
-            setError("Could not sign in with demo account. Please try manual login.");
+            let msg = "Could not sign in with demo account.";
+            if (err.response?.data?.detail) {
+                const detail = err.response.data.detail;
+                msg = typeof detail === "string" ? detail : (Array.isArray(detail) ? detail.map((d) => d.msg || "").join(", ") : JSON.stringify(detail));
+            } else if (err.message) {
+                msg = `Connection error: ${err.message}`;
+            }
+            setError(msg);
         } finally {
             setLoading(false);
         }
