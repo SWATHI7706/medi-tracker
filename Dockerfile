@@ -36,5 +36,5 @@ COPY --from=frontend-builder /app/frontend/dist /app/static/dist
 # Expose default Cloud Run port
 EXPOSE 8080
 
-# Run Uvicorn binding to 0.0.0.0 and dynamic Cloud Run $PORT
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+# Run Uvicorn directly via Python entrypoint binding to dynamic Cloud Run $PORT
+CMD ["python", "main.py"]
