@@ -1299,11 +1299,45 @@ async def get_doctor_summary_pdf(
 # --- Database Ping ---
 @app.get("/api/db-check")
 async def db_check():
+    import database
+
+    url_preview = database.MONGO_URL
+    if "@" in url_preview:
+        prefix = url_preview.split("@")[0]
+        suffix = url_preview.split("@")[-1]
+        scheme = prefix.split("://")[0] if "://" in prefix else "mongodb"
+        url_preview = f"{scheme}://***:***@{suffix}"
+
+    if database._init_error:
+        return {
+            "status": "error",
+            "error_stage": "Initialization",
+            "message": f"Failed to initialize client: {database._init_error}",
+            "mongo_url_configured": url_preview,
+            "is_localhost": "localhost" in database.MONGO_URL,
+            "hint": "Check connection string format and credentials."
+        }
+
     try:
         await db.command("ping")
-        return {"status": "connected", "database": db.name}
+        return {
+            "status": "connected",
+            "database": db.name,
+            "connected_to": url_preview,
+        }
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return {
+            "status": "error",
+            "error_stage": "Ping",
+            "message": str(e),
+            "mongo_url_configured": url_preview,
+            "is_localhost": "localhost" in database.MONGO_URL,
+            "hint": (
+                "Cloud Run is still using localhost:27017! This means the MONGO_URL variable was either not saved or the new revision with the variable has not finished deploying."
+                if "localhost" in database.MONGO_URL
+                else "Cloud Run attempted to connect to your remote MongoDB, but connection timed out or failed. Please check: 1) MongoDB Atlas Network Access has 0.0.0.0/0 enabled. 2) Database user password is correct (without < > brackets)."
+            ),
+        }
 
 # --- SPA Client-Side Routing Handler for Frontend ---
 if os.path.exists(FRONTEND_DIST):
