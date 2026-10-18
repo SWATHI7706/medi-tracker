@@ -49,12 +49,25 @@ if not raw_mongo_url:
 MONGO_URL = sanitize_mongo_url(raw_mongo_url)
 DB_NAME = os.getenv("DB_NAME", "medi_tracker").strip()
 
+try:
+    import certifi
+    ca_file = certifi.where()
+except Exception:
+    ca_file = None
+
+client_kwargs = {
+    "serverSelectionTimeoutMS": 5000,
+    "connectTimeoutMS": 5000,
+}
+
+if ca_file and ("mongodb+srv://" in MONGO_URL or "ssl=true" in MONGO_URL.lower() or "tls=true" in MONGO_URL.lower()):
+    client_kwargs["tlsCAFile"] = ca_file
+
 _init_error = None
 try:
     client = AsyncIOMotorClient(
         MONGO_URL,
-        serverSelectionTimeoutMS=5000,
-        connectTimeoutMS=5000,
+        **client_kwargs,
     )
     db = client[DB_NAME]
 except Exception as e:

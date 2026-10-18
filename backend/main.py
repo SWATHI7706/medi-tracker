@@ -1335,7 +1335,11 @@ async def db_check():
             "hint": (
                 "Cloud Run is still using localhost:27017! This means the MONGO_URL variable was either not saved or the new revision with the variable has not finished deploying."
                 if "localhost" in database.MONGO_URL
-                else "Cloud Run attempted to connect to your remote MongoDB, but connection timed out or failed. Please check: 1) MongoDB Atlas Network Access has 0.0.0.0/0 enabled. 2) Database user password is correct (without < > brackets)."
+                else (
+                    "SSL Handshake failed (TLS alert internal error). In MongoDB Atlas, go to Network Access -> Add IP Address -> click 'Allow Access from Anywhere' (0.0.0.0/0) and confirm."
+                    if "TLSV1_ALERT_INTERNAL_ERROR" in str(e) or "SSL handshake failed" in str(e)
+                    else "Cloud Run attempted to connect to your remote MongoDB, but connection timed out or failed. Please check: 1) MongoDB Atlas Network Access has 0.0.0.0/0 enabled. 2) Database user password is correct (without < > brackets)."
+                )
             ),
         }
 
