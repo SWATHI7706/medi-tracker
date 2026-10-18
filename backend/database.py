@@ -1,11 +1,38 @@
 import os
 import logging
+import urllib.parse
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 
 load_dotenv()
 
 logger = logging.getLogger("medi_tracker.database")
+
+def sanitize_mongo_url(url: str) -> str:
+    """
+    Safely encodes special characters in MongoDB username and password
+    according to RFC 3986 (quote_plus) to prevent ConfigurationError.
+    """
+    url = url.strip().strip('"').strip("'")
+    if "://" not in url or "@" not in url:
+        return url
+
+    scheme, rest = url.split("://", 1)
+    last_at = rest.rfind("@")
+    creds_part = rest[:last_at]
+    host_part = rest[last_at + 1:]
+
+    if ":" in creds_part:
+        username, password = creds_part.split(":", 1)
+        unquoted_user = urllib.parse.unquote(username)
+        unquoted_pass = urllib.parse.unquote(password)
+        safe_user = urllib.parse.quote_plus(unquoted_user)
+        safe_pass = urllib.parse.quote_plus(unquoted_pass)
+        return f"{scheme}://{safe_user}:{safe_pass}@{host_part}"
+    else:
+        unquoted_user = urllib.parse.unquote(creds_part)
+        safe_user = urllib.parse.quote_plus(unquoted_user)
+        return f"{scheme}://{safe_user}@{host_part}"
 
 # Support common environment variable names
 raw_mongo_url = (
@@ -19,8 +46,7 @@ raw_mongo_url = (
 if not raw_mongo_url:
     raw_mongo_url = "mongodb://localhost:27017"
 
-# Strip accidental surrounding quotes from web consoles or .env files
-MONGO_URL = raw_mongo_url.strip('"').strip("'").strip()
+MONGO_URL = sanitize_mongo_url(raw_mongo_url)
 DB_NAME = os.getenv("DB_NAME", "medi_tracker").strip()
 
 _init_error = None
