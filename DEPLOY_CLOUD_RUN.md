@@ -38,6 +38,7 @@ This project is configured as a **unified, multi-stage production container**. I
    - Add Environment Variables:
      - `MONGO_URL` = your MongoDB Atlas connection string
      - `JWT_SECRET` = your secure JWT secret key
+      - `GEMINI_API_KEY` = your Google Gemini API key (optional: https://aistudio.google.com/app/apikey)
    - Default Port: `8080` (already pre-configured in the Dockerfile)
    - Memory: `512 MiB` (or `1 GiB`)
 9. Click **Create**. Google Cloud Build will automatically build the container and deploy it to a live HTTPS URL!

@@ -131,4 +131,28 @@ class PatientProfileResponse(BaseModel):
     doctor_notes: List[DoctorNoteSchema] = []
     updated_at: Optional[str] = None
     is_caregiver: Optional[bool] = False
-    can_edit: Optional[bool] = True
+    can_edit: Optional[bool] = True
+
+class ChatMessage(BaseModel):
+    role: str  # "user" | "assistant" | "system"
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    patient_id: Optional[str] = None
+
+class ChatAction(BaseModel):
+    type: str  # "log_dose" | "refill"
+    medicine_id: Optional[str] = None
+    medicine_name: Optional[str] = None
+    time: Optional[str] = None
+    status: Optional[str] = None
+    amount: Optional[int] = None
+    description: Optional[str] = None
+
+class ChatResponse(BaseModel):
+    reply: str
+    action: Optional[ChatAction] = None
+    suggested_prompts: Optional[List[str]] = None
+    powered_by: str = "gemini"
+

@@ -36,7 +36,11 @@ from models import (
     DoctorNoteSchema,
     PatientProfileUpdate,
     PatientProfileResponse,
+    ChatRequest,
+    ChatResponse,
+    ChatAction,
 )
+from ai_service import generate_chat_response
 
 app = FastAPI(title="Medi Tracker API")
 
@@ -92,6 +96,16 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 
 security = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
+
+async def get_optional_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional)) -> Optional[dict]:
+    if not credentials or not credentials.credentials:
+        return None
+    try:
+        return await get_current_user(credentials)
+    except Exception:
+        return None
+
 
 # In-memory user cache fallback to guarantee sign-in even if remote MongoDB connection is interrupted
 _memory_users: Dict[str, Any] = {}
@@ -1295,6 +1309,132 @@ async def get_doctor_summary_pdf(
             "Cache-Control": "no-cache",
         },
     )
+
+# --- MediBot AI Clinical Assistant Endpoints ---
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat_with_medibot(
+    req: ChatRequest,
+    current_user: Optional[dict] = Depends(get_optional_current_user),
+):
+    if current_user:
+        target_id = req.patient_id or current_user["id"]
+        effective_id = await verify_delegated_access(current_user, target_id, "view")
+        user_id = current_user["id"]
+    else:
+        effective_id = None
+        user_id = "guest"
+
+    messages_data = [m.model_dump() for m in req.messages]
+    response_data = await generate_chat_response(
+        db=db,
+        user_id=user_id,
+        messages=messages_data,
+        patient_id=effective_id,
+    )
+    return response_data
+
+@app.post("/api/chat/execute-action")
+async def execute_chat_action(
+    action: ChatAction,
+    patient_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    target_id = patient_id or current_user["id"]
+    effective_id = await verify_delegated_access(current_user, target_id, "full")
+
+    if action.type == "log_dose":
+        if not action.medicine_id or not action.time:
+            raise HTTPException(status_code=400, detail="Missing medicine_id or time for dose logging")
+
+        today = date.today().isoformat()
+        clean_time = action.time.strip()
+        status_to_set = action.status or "taken"
+
+        # Check previous status
+        existing = await db.intake_logs.find_one({
+            "medicine_id": action.medicine_id,
+            "date": today,
+            "time": clean_time,
+            "owner_id": effective_id,
+        })
+        prev_status = existing.get("status") if existing else None
+
+        # Upsert log
+        await db.intake_logs.update_one(
+            {
+                "medicine_id": action.medicine_id,
+                "date": today,
+                "time": clean_time,
+                "owner_id": effective_id,
+            },
+            {
+                "$set": {
+                    "medicine_id": action.medicine_id,
+                    "date": today,
+                    "time": clean_time,
+                    "status": status_to_set,
+                    "owner_id": effective_id,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            },
+            upsert=True,
+        )
+
+        # Update stock
+        try:
+            oid = ObjectId(action.medicine_id)
+            if prev_status != "taken" and status_to_set == "taken":
+                med = await db.medicines.find_one({"_id": oid, "owner_id": effective_id})
+                if med:
+                    curr_stock = med.get("total_stock", 30)
+                    new_stock = max(0, curr_stock - 1)
+                    await db.medicines.update_one(
+                        {"_id": oid, "owner_id": effective_id},
+                        {"$set": {"total_stock": new_stock}},
+                    )
+            elif prev_status == "taken" and status_to_set != "taken":
+                await db.medicines.update_one(
+                    {"_id": oid, "owner_id": effective_id},
+                    {"$inc": {"total_stock": 1}},
+                )
+        except Exception as e:
+            logger.warning(f"Error adjusting stock during chat action: {e}")
+
+        return {
+            "status": "success",
+            "message": f"Successfully logged {action.medicine_name or 'dose'} as {status_to_set.capitalize()} for {clean_time}!",
+            "action": action.model_dump(),
+        }
+
+    elif action.type == "refill":
+        if not action.medicine_id:
+            raise HTTPException(status_code=400, detail="Missing medicine_id for refill")
+
+        try:
+            oid = ObjectId(action.medicine_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid medicine ID")
+
+        amount = max(1, action.amount or 30)
+        med = await db.medicines.find_one({"_id": oid, "owner_id": effective_id})
+        if not med:
+            raise HTTPException(status_code=404, detail="Medicine not found")
+
+        curr_stock = med.get("total_stock", 0)
+        new_stock = curr_stock + amount
+        await db.medicines.update_one(
+            {"_id": oid, "owner_id": effective_id},
+            {"$set": {"total_stock": new_stock}},
+        )
+
+        return {
+            "status": "success",
+            "message": f"Successfully refilled {action.medicine_name or 'medicine'} with +{amount} units (total: {new_stock})!",
+            "action": action.model_dump(),
+        }
+
+    raise HTTPException(status_code=400, detail=f"Unsupported action type '{action.type}'")
+
 
 # --- Database Ping ---
 @app.get("/api/db-check")

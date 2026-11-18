@@ -33,6 +33,7 @@ import HistoryModal from "./components/HistoryModal";
 import HealthTips from "./components/HealthTips";
 import AuthModal from "./components/AuthModal";
 import PatientProfile from "./components/PatientProfile";
+import ChatBot from "./components/ChatBot";
 import { API_BASE_URL } from "./api";
 
 const API = API_BASE_URL;
@@ -973,6 +974,14 @@ export default function App() {
 
             {/* Medication History Modal */}
             {showHistory && <HistoryModal onClose={() => setShowHistory(false)} />}
+
+            {/* MediBot Clinical AI Assistant (always accessible for visitors & authenticated patients) */}
+            <ChatBot
+                currentUser={user}
+                onActionExecuted={() => {
+                    triggerAllRefresh();
+                }}
+            />
         </div>
     );
 }
